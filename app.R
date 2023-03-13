@@ -4,8 +4,9 @@ library(shiny)
 
 ui <- fluidPage(
   
-  # Application title
+  # browser  title
   title = "Stock/ETF Analysis and Predictions",
+  # Application title
   titlePanel(div("Stock/ETF Analysis and Predictions", style = "color: #FFFFFF;font-size:25px;font-style: italic;")),
   
   tags$style('.container-fluid {background-color:black;}'),
