@@ -1,0 +1,631 @@
+---
+title: "D590_Final_Project_Part_2"
+author: "Brian Kenney, Prabakar Mohan, Brendan Kelly"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# Load Library Packages
+
+```{r setup, include=FALSE}
+library(fpp3)
+library(fable.prophet)
+```
+
+# AAPL
+
+## Set up File name
+
+```{r}
+file = "Data/AAPL_2023-03-26.csv"
+```
+
+## Read the .CSV and select Date and Closing Price
+
+```{r}
+Stock_information <- read.csv(file)
+selected_stock_information <- Stock_information %>% select(c('Date','Close')) %>% mutate(row_value = row_number())
+```
+
+## Collect Stock/ETF Ticker to be displayed on future visualizations to remove confusion
+
+```{r}
+file_name = substring(file,6,9)
+```
+
+## First set
+
+```{r}
+selected_stock_information_tsibble <- as_tsibble(selected_stock_information, index = row_value)
+```
+
+## Set up for Monthly; second set. This could be useful in the futre.
+
+```{r}
+selected_stock_information_monthly <- yearmonth(selected_stock_information$`Date`, format = "%Y-%m-%d") 
+selected_stock_information$`Date` <- selected_stock_information_monthly
+selected_stock_information_montly_tsibble <- as_tsibble(selected_stock_information, index = row_value) 
+```
+
+```{r}
+selected_stock_information_montly_aggregated_tsibble <- selected_stock_information_montly_tsibble %>% aggregate(Close ~ Date, sum) %>% mutate(row_value = row_number()) %>% as_tsibble(index = row_value) 
+```
+
+
+# Decomposition
+
+```{r}
+dcmp <- selected_stock_information_tsibble |>
+  model(stl = STL(Close))
+
+components(dcmp) |> autoplot() +
+  labs(title = paste(file_name, "STL decomoposition"),
+       y = "Stock Value ($)",
+       x = "Trading Days")
+```
+# Time Series Visualization (needs another visualization)
+
+```{r}
+autoplot(selected_stock_information_tsibble) +
+  labs(y = "Stock Value ($)",
+       title = paste(file_name,"Daily Closing Price over Time"),
+       x = "Trading Days")
+```
+
+
+## Checking if the data is stationary. If kpss_stat > kpss_pvalue, then we reject null hypothesis and claim the data is non-stationary. Differencing will be required.
+
+```{r}
+selected_stock_information_tsibble |>
+  features(Close, unitroot_kpss)
+```
+
+## Output is the number of differences make the data stationary
+
+```{r}
+selected_stock_information_tsibble |>
+  features(Close, unitroot_ndiffs)
+```
+
+## The difference 
+
+```{r}
+selected_stock_information_tsibble |>
+  mutate(diff_close = difference(Close)) |>
+  features(diff_close, unitroot_kpss)
+```
+
+
+### Using Box-Cox Transformation does not change the shape of the Closing Price with a lambda value of 1.
+
+```{r}
+lambda <- selected_stock_information_tsibble |>
+  features(Close, features = guerrero) |>
+  pull(lambda_guerrero)
+selected_stock_information_tsibble |>
+  autoplot(box_cox(Close, lambda)) +
+  labs(y = "",
+       title = latex2exp::TeX(paste(file_name,
+         "Transformed Closing Price with $\\lambda$ = ",
+         round(lambda,2))))
+```
+
+
+
+# Description of the Time Series:
+
+### INPUT SOMETHING 
+
+# TS Models (transformations)
+
+### Input SOMETHING like differencing?
+
+# Predictions
+
+## ARIMA approach
+
+```{r}
+selected_stock_information_tsibble |>
+  gg_tsdisplay(difference(Close), plot_type='partial')
+```
+
+## Generate a few ARIMA orders and then compare results.
+
+```{r}
+selected_stock_fit <- selected_stock_information_tsibble |>
+  model(arima010 = ARIMA(Close ~ pdq(0,1,0)),
+        arima110 = ARIMA(Close ~ pdq(1,1,0)),
+        arima011 = ARIMA(Close ~ pdq(0,1,1)),
+        arima111 = ARIMA(Close ~ pdq(1,1,1)),
+        stepwise = ARIMA(Close),
+        search = ARIMA(Close, stepwise=FALSE))
+
+print(selected_stock_fit$search)
+
+glance(selected_stock_fit) |> arrange(AICc) |> select(.model:BIC)
+```
+
+## Show the residuals using the 'search' ARIMA 
+
+```{r}
+selected_stock_fit |>
+  select(search) |>
+  gg_tsresiduals()
+```
+
+### Portmanteau test shows a large P-value, suggesting the residuals are simliar to white noise
+
+```{r}
+augment(selected_stock_fit) |>
+  filter(.model=='search') |>
+  features(.innov, ljung_box, lag = 10, dof = 3)
+```
+
+## First Prediction using ARIMA
+
+```{r}
+selected_stock_fit |>
+  forecast(h=10) |>
+  filter(.model=='search') |>
+  autoplot(selected_stock_information_tsibble)  +
+  labs(y = "Stock Value ($)",
+       title = paste(file_name, "Daily Closing Price over Time"),
+       x = "Trading Days")
+```
+
+## Second approach, first creating a Train set and a Test set
+
+```{r}
+length_df = nrow(selected_stock_information_tsibble)
+Train_number = round(length_df * 0.98, 0)
+
+
+Train <- selected_stock_information_tsibble[0:Train_number,]
+Test <- selected_stock_information_tsibble[Train_number:length_df,]
+
+```
+
+## Period is set to twelve for the months, and order = 1 since data is non-seasonal
+
+```{r}
+selected_stock_information_tsibble_fit <- Train |>
+  model(
+    arima = ARIMA(Close),
+    ets = ETS(Close),
+    prophet = prophet(Close ~ season(period = 12, order = 1,
+                                    type = "additive"))
+  )
+```
+
+# Prophet model is not good since there is no seasonality
+
+```{r}
+selected_stock_information_tsibble_fit_fc <- selected_stock_information_tsibble_fit |> forecast(h = 30)
+selected_stock_information_tsibble_fit_fc |> autoplot() + autolayer(selected_stock_information_tsibble) +   
+  labs(y = "Stock Value ($)",
+       title = paste(file_name, "Daily Closing Price over Time"),
+       x = "Trading Days")
+```
+
+
+
+```{r}
+
+```
+
+
+
+
+# MSFT
+
+## Set up File name
+
+```{r}
+file = "Data/MSFT_2023-03-26.csv"
+```
+
+## Read the .CSV and select Date and Closing Price
+
+```{r}
+Stock_information <- read.csv(file)
+selected_stock_information <- Stock_information %>% select(c('Date','Close')) %>% mutate(row_value = row_number())
+```
+
+## Collect Stock/ETF Ticker to be displayed on future visualizations to remove confusion
+
+```{r}
+file_name = substring(file,6,9)
+```
+
+## First set
+
+```{r}
+selected_stock_information_tsibble <- as_tsibble(selected_stock_information, index = row_value)
+```
+
+## Set up for Monthly; second set. This could be useful in the futre.
+
+```{r}
+selected_stock_information_monthly <- yearmonth(selected_stock_information$`Date`, format = "%Y-%m-%d") 
+selected_stock_information$`Date` <- selected_stock_information_monthly
+selected_stock_information_montly_tsibble <- as_tsibble(selected_stock_information, index = row_value) 
+```
+
+```{r}
+selected_stock_information_montly_aggregated_tsibble <- selected_stock_information_montly_tsibble %>% aggregate(Close ~ Date, sum) %>% mutate(row_value = row_number()) %>% as_tsibble(index = row_value) 
+```
+
+
+# Decomposition
+
+```{r}
+dcmp <- selected_stock_information_tsibble |>
+  model(stl = STL(Close))
+
+components(dcmp) |> autoplot() +
+  labs(title = paste(file_name, "STL decomoposition"),
+       y = "Stock Value ($)",
+       x = "Trading Days")
+```
+# Time Series Visualization (needs another visualization)
+
+```{r}
+autoplot(selected_stock_information_tsibble) +
+  labs(y = "Stock Value ($)",
+       title = paste(file_name,"Daily Closing Price over Time"),
+       x = "Trading Days")
+```
+
+
+## Checking if the data is stationary. If kpss_stat > kpss_pvalue, then we reject null hypothesis and claim the data is non-stationary. Differencing will be required.
+
+```{r}
+selected_stock_information_tsibble |>
+  features(Close, unitroot_kpss)
+```
+
+## Output is the number of differences make the data stationary
+
+```{r}
+selected_stock_information_tsibble |>
+  features(Close, unitroot_ndiffs)
+```
+
+## The difference 
+
+```{r}
+selected_stock_information_tsibble |>
+  mutate(diff_close = difference(Close)) |>
+  features(diff_close, unitroot_kpss)
+```
+
+
+### Using Box-Cox Transformation does not change the shape of the Closing Price with a lambda value of 1.
+
+```{r}
+lambda <- selected_stock_information_tsibble |>
+  features(Close, features = guerrero) |>
+  pull(lambda_guerrero)
+selected_stock_information_tsibble |>
+  autoplot(box_cox(Close, lambda)) +
+  labs(y = "",
+       title = latex2exp::TeX(paste(file_name,
+         "Transformed Closing Price with $\\lambda$ = ",
+         round(lambda,2))))
+```
+
+
+
+# Description of the Time Series:
+
+### INPUT SOMETHING 
+
+# TS Models (transformations)
+
+### Input SOMETHING like differencing?
+
+# Predictions
+
+## ARIMA approach
+
+```{r}
+selected_stock_information_tsibble |>
+  gg_tsdisplay(difference(Close), plot_type='partial')
+```
+
+## Generate a few ARIMA orders and then compare results.
+
+```{r}
+selected_stock_fit <- selected_stock_information_tsibble |>
+  model(arima010 = ARIMA(Close ~ pdq(0,1,0)),
+        arima110 = ARIMA(Close ~ pdq(1,1,0)),
+        arima011 = ARIMA(Close ~ pdq(0,1,1)),
+        arima111 = ARIMA(Close ~ pdq(1,1,1)),
+        stepwise = ARIMA(Close),
+        search = ARIMA(Close, stepwise=FALSE))
+
+print(selected_stock_fit$search)
+
+glance(selected_stock_fit) |> arrange(AICc) |> select(.model:BIC)
+```
+
+## Show the residuals using the 'search' ARIMA 
+
+```{r}
+selected_stock_fit |>
+  select(search) |>
+  gg_tsresiduals()
+```
+
+### Portmanteau test shows a large P-value, suggesting the residuals are simliar to white noise
+
+```{r}
+augment(selected_stock_fit) |>
+  filter(.model=='search') |>
+  features(.innov, ljung_box, lag = 10, dof = 3)
+```
+
+## First Prediction using ARIMA
+
+```{r}
+selected_stock_fit |>
+  forecast(h=10) |>
+  filter(.model=='search') |>
+  autoplot(selected_stock_information_tsibble)  +
+  labs(y = "Stock Value ($)",
+       title = paste(file_name, "Daily Closing Price over Time"),
+       x = "Trading Days")
+```
+
+## Second approach, first creating a Train set and a Test set
+
+```{r}
+length_df = nrow(selected_stock_information_tsibble)
+Train_number = round(length_df * 0.98, 0)
+
+
+Train <- selected_stock_information_tsibble[0:Train_number,]
+Test <- selected_stock_information_tsibble[Train_number:length_df,]
+
+```
+
+## Period is set to twelve for the months, and order = 1 since data is non-seasonal
+
+```{r}
+selected_stock_information_tsibble_fit <- Train |>
+  model(
+    arima = ARIMA(Close),
+    ets = ETS(Close),
+    prophet = prophet(Close ~ season(period = 12, order = 1,
+                                    type = "additive"))
+  )
+```
+
+# Prophet model is not good since there is no seasonality
+
+```{r}
+selected_stock_information_tsibble_fit_fc <- selected_stock_information_tsibble_fit |> forecast(h = 30)
+selected_stock_information_tsibble_fit_fc |> autoplot() + autolayer(selected_stock_information_tsibble) +   
+  labs(y = "Stock Value ($)",
+       title = paste(file_name, "Daily Closing Price over Time"),
+       x = "Trading Days")
+```
+
+
+
+
+```{r}
+
+```
+
+# TSLA
+
+## Set up File name
+
+```{r}
+file = "Data/TSLA_2023-03-26.csv"
+```
+
+## Read the .CSV and select Date and Closing Price
+
+```{r}
+Stock_information <- read.csv(file)
+selected_stock_information <- Stock_information %>% select(c('Date','Close')) %>% mutate(row_value = row_number())
+```
+
+## Collect Stock/ETF Ticker to be displayed on future visualizations to remove confusion
+
+```{r}
+file_name = substring(file,6,9)
+```
+
+## First set
+
+```{r}
+selected_stock_information_tsibble <- as_tsibble(selected_stock_information, index = row_value)
+```
+
+## Set up for Monthly; second set. This could be useful in the futre.
+
+```{r}
+selected_stock_information_monthly <- yearmonth(selected_stock_information$`Date`, format = "%Y-%m-%d") 
+selected_stock_information$`Date` <- selected_stock_information_monthly
+selected_stock_information_montly_tsibble <- as_tsibble(selected_stock_information, index = row_value) 
+```
+
+```{r}
+selected_stock_information_montly_aggregated_tsibble <- selected_stock_information_montly_tsibble %>% aggregate(Close ~ Date, sum) %>% mutate(row_value = row_number()) %>% as_tsibble(index = row_value) 
+```
+
+
+# Decomposition
+
+```{r}
+dcmp <- selected_stock_information_tsibble |>
+  model(stl = STL(Close))
+
+components(dcmp) |> autoplot() +
+  labs(title = paste(file_name, "STL decomoposition"),
+       y = "Stock Value ($)",
+       x = "Trading Days")
+```
+# Time Series Visualization (needs another visualization)
+
+```{r}
+autoplot(selected_stock_information_tsibble) +
+  labs(y = "Stock Value ($)",
+       title = paste(file_name,"Daily Closing Price over Time"),
+       x = "Trading Days")
+```
+
+
+## Checking if the data is stationary. If kpss_stat > kpss_pvalue, then we reject null hypothesis and claim the data is non-stationary. Differencing will be required.
+
+```{r}
+selected_stock_information_tsibble |>
+  features(Close, unitroot_kpss)
+```
+
+## Output is the number of differences make the data stationary
+
+```{r}
+selected_stock_information_tsibble |>
+  features(Close, unitroot_ndiffs)
+```
+
+## The difference 
+
+```{r}
+selected_stock_information_tsibble |>
+  mutate(diff_close = difference(Close)) |>
+  features(diff_close, unitroot_kpss)
+```
+
+
+### Using Box-Cox Transformation does not change the shape of the Closing Price with a lambda value of 1.
+
+```{r}
+lambda <- selected_stock_information_tsibble |>
+  features(Close, features = guerrero) |>
+  pull(lambda_guerrero)
+selected_stock_information_tsibble |>
+  autoplot(box_cox(Close, lambda)) +
+  labs(y = "",
+       title = latex2exp::TeX(paste(file_name,
+         "Transformed Closing Price with $\\lambda$ = ",
+         round(lambda,2))))
+```
+
+
+
+# Description of the Time Series:
+
+### INPUT SOMETHING 
+
+# TS Models (transformations)
+
+### Input SOMETHING like differencing?
+
+# Predictions
+
+## ARIMA approach
+
+```{r}
+selected_stock_information_tsibble |>
+  gg_tsdisplay(difference(Close), plot_type='partial')
+```
+
+## Generate a few ARIMA orders and then compare results.
+
+```{r}
+selected_stock_fit <- selected_stock_information_tsibble |>
+  model(arima010 = ARIMA(Close ~ pdq(0,1,0)),
+        arima110 = ARIMA(Close ~ pdq(1,1,0)),
+        arima011 = ARIMA(Close ~ pdq(0,1,1)),
+        arima111 = ARIMA(Close ~ pdq(1,1,1)),
+        stepwise = ARIMA(Close),
+        search = ARIMA(Close, stepwise=FALSE))
+
+print(selected_stock_fit$search)
+
+glance(selected_stock_fit) |> arrange(AICc) |> select(.model:BIC)
+```
+
+## Show the residuals using the 'search' ARIMA 
+
+```{r}
+selected_stock_fit |>
+  select(search) |>
+  gg_tsresiduals()
+```
+
+### Portmanteau test shows a large P-value, suggesting the residuals are simliar to white noise
+
+```{r}
+augment(selected_stock_fit) |>
+  filter(.model=='search') |>
+  features(.innov, ljung_box, lag = 10, dof = 3)
+```
+
+## First Prediction using ARIMA
+
+```{r}
+selected_stock_fit |>
+  forecast(h=10) |>
+  filter(.model=='search') |>
+  autoplot(selected_stock_information_tsibble)  +
+  labs(y = "Stock Value ($)",
+       title = paste(file_name, "Daily Closing Price over Time"),
+       x = "Trading Days")
+```
+
+## Second approach, first creating a Train set and a Test set
+
+```{r}
+length_df = nrow(selected_stock_information_tsibble)
+Train_number = round(length_df * 0.98, 0)
+
+
+Train <- selected_stock_information_tsibble[0:Train_number,]
+Test <- selected_stock_information_tsibble[Train_number:length_df,]
+
+```
+
+## Period is set to twelve for the months, and order = 1 since data is non-seasonal
+
+```{r}
+selected_stock_information_tsibble_fit <- Train |>
+  model(
+    arima = ARIMA(Close),
+    ets = ETS(Close),
+    prophet = prophet(Close ~ season(period = 12, order = 1,
+                                    type = "additive"))
+  )
+```
+
+# Prophet model is not good since there is no seasonality
+
+```{r}
+selected_stock_information_tsibble_fit_fc <- selected_stock_information_tsibble_fit |> forecast(h = 30)
+selected_stock_information_tsibble_fit_fc |> autoplot() + autolayer(selected_stock_information_tsibble) +   
+  labs(y = "Stock Value ($)",
+       title = paste(file_name, "Daily Closing Price over Time"),
+       x = "Trading Days")
+```
+
+
+
+```{r}
+
+```
+
+
+# Team contributions (pending...)
+
+Brian: Completed rough draft of the Part 2 submission. 
+
+Mohan: Generated Github repo and place Datasets. Picked option 1.
+
+Brendan: Picked option 1.
