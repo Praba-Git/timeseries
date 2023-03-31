@@ -5,9 +5,10 @@ account: time-series-final-project-sp2023
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 8541591
-bundleId: 6945837
+bundleId: 7033530
 url: https://time-series-final-project-sp2023.shinyapps.io/TS-Stock-Predictor/
-when: 1678547834.69776
-lastSyncTime: 1678547834.69777
+when: 1680277780.43572
+lastSyncTime: 1680277780.43573
 asMultiple: FALSE
 asStatic: FALSE
+ignoredFiles: D590_Final_Project_Part_2.html|D590_Final_Project_Part_2.pdf|D590_Final_Project_Part_2.Rmd|Data/AAPL_2023-03-26.csv|Data/MSFT_2023-03-26.csv|Data/TSLA_2023-03-26.csv
