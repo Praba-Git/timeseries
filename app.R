@@ -1,5 +1,6 @@
 library(quantmod)
 library(shiny)
+library(forecast)
 
 
 ui <- fluidPage(
@@ -24,52 +25,106 @@ ui <- fluidPage(
      
        # days for prediction ahead
       div(style = "white-space: nowrap;", 
-          numericInput("h", "Days to Predict", value = 10,width = "50px")
+          numericInput("h", "Days to Predict", value =2,width = "65px")
       ),
       
       # add options for selecting a prediction method
       radioButtons("model", "Forecasting Model Applied",
                    choices = c("naive", "ARIMA", "GARCH","Prophet","K-NN","FF-NN"),
-                   choiceValues = "ARIMA")
+                   choiceValues = "ARIMA"
+                   )
      
     ),
    
     # Show a plot of the generated distribution
-    mainPanel(
-      plotOutput("qm_plot")
+    # mainPanel(plotOutput("qm_plot"))
+    
+    fluidRow(
+      column(width = 7, plotOutput("qm_plot") ),
+      column(width = 7, plotOutput("qm_plot1"))
     )
   )
 )
 
 server <- function(input, output, session){
 
-    output$qm_plot <- renderPlot({
-    
-    if(input$tabset =="Stocks")
-    {
-      ticker = input$Stock
-    }
-    else
-    {
-      ticker = input$ETF
-    }
-  
-    stockEnv <- new.env()
-    getSymbols(ticker, from=input$date_range[1],to=input$date_range[2], env=stockEnv)
-    stock = ls(stockEnv)
-    chartSeries(stockEnv[[ls(stockEnv)]], 
-                name = ticker, theme=chartTheme('white')) 
-    
-    MACD2plot_plus   = which(diff(sign(MACD(Cl(stockEnv[[stock]]))[,1])) > 0)
-    MACD2plot_minus  = which(diff(sign(MACD(Cl(stockEnv[[stock]]))[,1])) < 0)
-    range_y          = 0.5
-    print(addPoints(MACD2plot_plus,  stockEnv[[stock]][MACD2plot_plus,  4] - range_y, pch=24, col='blue', offset=1.0))
-    print(addPoints(MACD2plot_minus, stockEnv[[stock]][MACD2plot_minus, 4] + range_y, pch=25, col='red',  offset=1.0))
-    print(addSMA(n=12, on=1, col = "blue"))
-    print(addSMA(n=26, on=1, col = "red"))
-    
 
-  })
+    #Show a plot of the ticker historical distribution
+    output$qm_plot <- renderPlot({
+      
+      if(input$tabset =="Stocks")
+      {
+        ticker = input$Stock
+      }
+      else
+      {
+        ticker = input$ETF
+      }      
+      
+      stockEnv <- new.env()
+      getSymbols(ticker, from=input$date_range[1],to=input$date_range[2], env=stockEnv)
+      stock = ls(stockEnv)
+      chartSeries(stockEnv[[ls(stockEnv)]], 
+                  name = ticker, theme=chartTheme('white')) 
+      
+      MACD2plot_plus   = which(diff(sign(MACD(Cl(stockEnv[[stock]]))[,1])) > 0)
+      MACD2plot_minus  = which(diff(sign(MACD(Cl(stockEnv[[stock]]))[,1])) < 0)
+      range_y          = 0.5
+      print(addPoints(MACD2plot_plus,  stockEnv[[stock]][MACD2plot_plus,  4] - range_y, pch=24, col='blue', offset=1.0))
+      print(addPoints(MACD2plot_minus, stockEnv[[stock]][MACD2plot_minus, 4] + range_y, pch=25, col='red',  offset=1.0))
+      print(addSMA(n=12, on=1, col = "blue"))
+      print(addSMA(n=26, on=1, col = "red"))
+      
+    
+    })
+
+    # Section to display forecast models
+    output$qm_plot1 <- renderPlot({
+      
+      if(input$tabset =="Stocks")
+      {
+        ticker = input$Stock
+      }
+      else
+      {
+        ticker = input$ETF
+      }
+     
+      stock <- getSymbols(ticker,src="yahoo",from=input$date_range[1],to=input$date_range[2],env=NULL)
+      n <- input$h
+      end = dim(stock)[1]
+      start = 1 #end - 1
+      close_price = paste(ticker,".Close",sep="")
+      
+      if (input$model == "naive"){
+      
+        mod <- naive(stock[start : end, close_price])
+        # Plot the result
+        autoplot(forecast(mod, h = n)) +
+          labs(y = "Price($)", x = " Time (days)")
+    
+      } else if (input$model == "ARIMA"){
+        
+        # Create the Model
+        mod <- auto.arima(train, seasonal=FALSE)
+        # Plot the result
+        autoplot(forecast(mod, h = n)) +
+          labs(y = "Price($)", x = " Time (days)")
+        
+      } else if (input$model == "GARCH") {
+        
+        # to be implemented
+        
+      } else if (input$model == "K-NN") {
+        
+        mod <- nnetar(stock[start : end, close_price])
+        # Plot the result
+        autoplot(forecast(mod, h = n)) +
+          labs(y = "Price($)", x = " Time (days)")
+        
+      }
+      
+    })    
 
 }
 shinyApp(ui, server)
