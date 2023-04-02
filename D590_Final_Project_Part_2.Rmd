@@ -3,14 +3,21 @@ title: "D590_Final_Project_Part_2"
 author: "Brian Kenney, Prabakar Mohan, Brendan Kelly"
 date: "`r Sys.Date()`"
 output:
+  html_document:
+    fig_height: 5
+    fig_width: 8
+    toc: yes
+    toc_depth: 1
+    toc_float:
+      collapsed: false
+    number_sections: false
+    theme: readable
+    highlight: tango
   pdf_document: default
-  html_document: default
 ---
 
-
-Load Library Packages
-
 ```{r setup, include=FALSE}
+'Load Library Packages'
 library(fpp3)
 library(fable.prophet)
 ```
@@ -31,7 +38,8 @@ Stock_information <- read.csv(file)
 
 selected_stock_information <- Stock_information %>% 
   select(c('Date','Close')) %>% 
-  mutate(row_value = row_number())
+  mutate(row_value = row_number(),
+         Date = as.Date(Date,origin="2022-01-01"))
 ```
 
 ## Collect Stock/ETF Ticker to be displayed on future visualizations to remove confusion
@@ -75,7 +83,7 @@ components(dcmp) |> autoplot() +
 ```
 
 \newpage
-# 1.2 - Time Series Visualization (needs another visualization)
+# 1.2 - Time Series Visualization
 
 ```{r}
 autoplot(selected_stock_information_tsibble) +
@@ -84,6 +92,23 @@ autoplot(selected_stock_information_tsibble) +
        x = "Trading Days")
 ```
 
+\newpage
+## create residual, ACF, PACF plots
+
+```{r}
+selected_stock_information_tsibble |>
+  gg_tsdisplay(difference(Close), plot_type='partial')
+```
+
+Residuals, ACF, and PACF suggest the series is similar to white noise.
+
+\newpage
+# 1.3 - Description of the Time Series:
+
+### INPUT SOMETHING 
+
+\newpage
+# 1.4 - TS Models (transformations)
 
 ## Checking if the data is stationary. If kpss_stat > kpss_pvalue, then we reject null hypothesis and claim the data is non-stationary. Differencing will be required.
 
@@ -122,28 +147,7 @@ selected_stock_information_tsibble |>
          round(lambda,2))))
 ```
 
-
-\newpage
-# 1.3 - Description of the Time Series:
-
-### INPUT SOMETHING 
-
-\newpage
-# 1.4 - TS Models (transformations)
-
-### Input SOMETHING like differencing?
-
-\newpage
-# 1.5 - Predictions
-
-## ARIMA approach
-
-```{r}
-selected_stock_information_tsibble |>
-  gg_tsdisplay(difference(Close), plot_type='partial')
-```
-
-## Generate a few ARIMA orders and then compare results.
+## First modeling approach will be to generate a few ARIMA orders and compare results.
 
 ```{r}
 selected_stock_fit <- selected_stock_information_tsibble |>
@@ -151,12 +155,12 @@ selected_stock_fit <- selected_stock_information_tsibble |>
         arima110 = ARIMA(Close ~ pdq(1,1,0)),
         arima011 = ARIMA(Close ~ pdq(0,1,1)),
         arima111 = ARIMA(Close ~ pdq(1,1,1)),
-        stepwise = ARIMA(Close),
         search = ARIMA(Close, stepwise=FALSE))
 
 print(selected_stock_fit$search)
 
 glance(selected_stock_fit) |> arrange(AICc) |> select(.model:BIC)
+
 ```
 
 ## Show the residuals using the 'search' ARIMA 
@@ -175,7 +179,37 @@ augment(selected_stock_fit) |>
   features(.innov, ljung_box, lag = 10, dof = 3)
 ```
 
-## First Prediction using ARIMA
+## Second approach, creating a Train set and a Test set with stepwise ARIMA and Prophet models
+
+```{r}
+length_df = nrow(selected_stock_information_tsibble)
+Train_number = round(length_df * 0.98, 0)
+
+
+Train <- selected_stock_information_tsibble %>%
+  filter(row_value <= Train_number) %>%
+  mutate(Date = as.Date(Date,origin="2022-01-01")) %>%
+  as_tsibble(index=Date) %>%
+  fill_gaps()
+Test <- selected_stock_information_tsibble[Train_number:length_df,]
+
+```
+
+## Period is set to twelve for the months, and order = 1 since data is non-seasonal
+
+```{r}
+selected_stock_information_tsibble_fit <- Train |>
+  model(
+    arima = ARIMA(Close),
+    prophet = prophet(Close ~ season(period = 12, order = 1,
+                                    type = "additive"))
+  )
+```
+
+\newpage
+# 1.5 - Predictions
+
+## First Prediction - uses selected ARIMA
 
 ```{r}
 selected_stock_fit |>
@@ -187,46 +221,16 @@ selected_stock_fit |>
        x = "Trading Days")
 ```
 
-## Second approach, first creating a Train set and a Test set
 
-```{r}
-length_df = nrow(selected_stock_information_tsibble)
-Train_number = round(length_df * 0.98, 0)
-
-
-Train <- selected_stock_information_tsibble[0:Train_number,]
-Test <- selected_stock_information_tsibble[Train_number:length_df,]
-
-```
-
-## Period is set to twelve for the months, and order = 1 since data is non-seasonal
-
-```{r}
-selected_stock_information_tsibble_fit <- Train |>
-  model(
-    arima = ARIMA(Close),
-    ets = ETS(Close),
-    prophet = prophet(Close ~ season(period = 12, order = 1,
-                                    type = "additive"))
-  )
-```
-
-## Prophet model is not good since there is no seasonality
+## Second Prediction set - Prophet + stepwise ARIMA
 
 ```{r}
 selected_stock_information_tsibble_fit_fc <- selected_stock_information_tsibble_fit |> forecast(h = 30)
-selected_stock_information_tsibble_fit_fc |> autoplot() + autolayer(selected_stock_information_tsibble) +   
+selected_stock_information_tsibble_fit_fc |> autoplot(selected_stock_information_tsibble %>% as_tsibble(index=Date)) +    
   labs(y = "Stock Value ($)",
        title = paste(file_name, "Daily Closing Price over Time"),
        x = "Trading Days")
 ```
-
-
-
-```{r}
-
-```
-
 
 
 \newpage
@@ -243,8 +247,11 @@ file = "Data/MSFT_2023-03-26.csv"
 
 ```{r}
 Stock_information <- read.csv(file)
-selected_stock_information <- Stock_information %>% select(c('Date','Close')) %>% 
-  mutate(row_value = row_number())
+
+selected_stock_information <- Stock_information %>% 
+  select(c('Date','Close')) %>% 
+  mutate(row_value = row_number(),
+         Date = as.Date(Date,origin="2022-01-01"))
 ```
 
 ## Collect Stock/ETF Ticker to be displayed on future visualizations to remove confusion
@@ -269,7 +276,8 @@ selected_stock_information_montly_tsibble <- as_tsibble(selected_stock_informati
 
 ```{r}
 selected_stock_information_montly_aggregated_tsibble <- selected_stock_information_montly_tsibble %>% 
-  aggregate(Close ~ Date, sum) %>% mutate(row_value = row_number()) %>% 
+  aggregate(Close ~ Date, sum) %>% 
+  mutate(row_value = row_number()) %>% 
   as_tsibble(index = row_value) 
 ```
 
@@ -287,7 +295,7 @@ components(dcmp) |> autoplot() +
 ```
 
 \newpage
-# 2.2 - Time Series Visualization (needs another visualization)
+# 2.2 - Time Series Visualization
 
 ```{r}
 autoplot(selected_stock_information_tsibble) +
@@ -296,6 +304,23 @@ autoplot(selected_stock_information_tsibble) +
        x = "Trading Days")
 ```
 
+\newpage
+## create residual, ACF, PACF plots
+
+```{r}
+selected_stock_information_tsibble |>
+  gg_tsdisplay(difference(Close), plot_type='partial')
+```
+
+Residuals, ACF, and PACF suggest the series is similar to white noise.
+
+\newpage
+# 2.3 - Description of the Time Series:
+
+### INPUT SOMETHING 
+
+\newpage
+# 2.4 - TS Models (transformations)
 
 ## Checking if the data is stationary. If kpss_stat > kpss_pvalue, then we reject null hypothesis and claim the data is non-stationary. Differencing will be required.
 
@@ -334,28 +359,7 @@ selected_stock_information_tsibble |>
          round(lambda,2))))
 ```
 
-
-\newpage
-# 2.3 - Description of the Time Series:
-
-### INPUT SOMETHING 
-
-\newpage
-# 2.4 - TS Models (transformations)
-
-### Input SOMETHING like differencing?
-
-\newpage
-# 2.5 - Predictions
-
-## ARIMA approach
-
-```{r}
-selected_stock_information_tsibble |>
-  gg_tsdisplay(difference(Close), plot_type='partial')
-```
-
-## Generate a few ARIMA orders and then compare results.
+## First modeling approach will be to generate a few ARIMA orders and compare results.
 
 ```{r}
 selected_stock_fit <- selected_stock_information_tsibble |>
@@ -363,12 +367,12 @@ selected_stock_fit <- selected_stock_information_tsibble |>
         arima110 = ARIMA(Close ~ pdq(1,1,0)),
         arima011 = ARIMA(Close ~ pdq(0,1,1)),
         arima111 = ARIMA(Close ~ pdq(1,1,1)),
-        stepwise = ARIMA(Close),
         search = ARIMA(Close, stepwise=FALSE))
 
 print(selected_stock_fit$search)
 
 glance(selected_stock_fit) |> arrange(AICc) |> select(.model:BIC)
+
 ```
 
 ## Show the residuals using the 'search' ARIMA 
@@ -387,7 +391,37 @@ augment(selected_stock_fit) |>
   features(.innov, ljung_box, lag = 10, dof = 3)
 ```
 
-## First Prediction using ARIMA
+## Second approach, creating a Train set and a Test set with stepwise ARIMA and Prophet models
+
+```{r}
+length_df = nrow(selected_stock_information_tsibble)
+Train_number = round(length_df * 0.98, 0)
+
+
+Train <- selected_stock_information_tsibble %>%
+  filter(row_value <= Train_number) %>%
+  mutate(Date = as.Date(Date,origin="2022-01-01")) %>%
+  as_tsibble(index=Date) %>%
+  fill_gaps()
+Test <- selected_stock_information_tsibble[Train_number:length_df,]
+
+```
+
+## Period is set to twelve for the months, and order = 1 since data is non-seasonal
+
+```{r}
+selected_stock_information_tsibble_fit <- Train |>
+  model(
+    arima = ARIMA(Close),
+    prophet = prophet(Close ~ season(period = 12, order = 1,
+                                    type = "additive"))
+  )
+```
+
+\newpage
+# 2.5 - Predictions
+
+## First Prediction - uses selected ARIMA
 
 ```{r}
 selected_stock_fit |>
@@ -399,45 +433,15 @@ selected_stock_fit |>
        x = "Trading Days")
 ```
 
-## Second approach, first creating a Train set and a Test set
 
-```{r}
-length_df = nrow(selected_stock_information_tsibble)
-Train_number = round(length_df * 0.98, 0)
-
-
-Train <- selected_stock_information_tsibble[0:Train_number,]
-Test <- selected_stock_information_tsibble[Train_number:length_df,]
-
-```
-
-## Period is set to twelve for the months, and order = 1 since data is non-seasonal
-
-```{r}
-selected_stock_information_tsibble_fit <- Train |>
-  model(
-    arima = ARIMA(Close),
-    ets = ETS(Close),
-    prophet = prophet(Close ~ season(period = 12, order = 1,
-                                    type = "additive"))
-  )
-```
-
-## Prophet model is not good since there is no seasonality
+## Second Prediction set - Prophet + stepwise ARIMA
 
 ```{r}
 selected_stock_information_tsibble_fit_fc <- selected_stock_information_tsibble_fit |> forecast(h = 30)
-selected_stock_information_tsibble_fit_fc |> autoplot() + autolayer(selected_stock_information_tsibble) +   
+selected_stock_information_tsibble_fit_fc |> autoplot(selected_stock_information_tsibble %>% as_tsibble(index=Date)) +    
   labs(y = "Stock Value ($)",
        title = paste(file_name, "Daily Closing Price over Time"),
        x = "Trading Days")
-```
-
-
-
-
-```{r}
-
 ```
 
 \newpage
@@ -457,7 +461,8 @@ Stock_information <- read.csv(file)
 
 selected_stock_information <- Stock_information %>% 
   select(c('Date','Close')) %>% 
-  mutate(row_value = row_number())
+  mutate(row_value = row_number(),
+         Date = as.Date(Date,origin="2022-01-01"))
 ```
 
 ## Collect Stock/ETF Ticker to be displayed on future visualizations to remove confusion
@@ -501,7 +506,7 @@ components(dcmp) |> autoplot() +
 ```
 
 \newpage
-# 3.2 - Time Series Visualization (needs another visualization)
+# 3.2 - Time Series Visualization
 
 ```{r}
 autoplot(selected_stock_information_tsibble) +
@@ -510,6 +515,23 @@ autoplot(selected_stock_information_tsibble) +
        x = "Trading Days")
 ```
 
+\newpage
+## create residual, ACF, PACF plots
+
+```{r}
+selected_stock_information_tsibble |>
+  gg_tsdisplay(difference(Close), plot_type='partial')
+```
+
+Residuals, ACF, and PACF suggest the series is similar to white noise.
+
+\newpage
+# 3.3 - Description of the Time Series:
+
+### INPUT SOMETHING 
+
+\newpage
+# 3.4 - TS Models (transformations)
 
 ## Checking if the data is stationary. If kpss_stat > kpss_pvalue, then we reject null hypothesis and claim the data is non-stationary. Differencing will be required.
 
@@ -548,28 +570,7 @@ selected_stock_information_tsibble |>
          round(lambda,2))))
 ```
 
-
-\newpage
-# 3.3 - Description of the Time Series:
-
-### INPUT SOMETHING 
-
-\newpage
-# 3.4 - TS Models (transformations)
-
-### Input SOMETHING like differencing?
-
-\newpage
-# 3.5 - Predictions
-
-## ARIMA approach
-
-```{r}
-selected_stock_information_tsibble |>
-  gg_tsdisplay(difference(Close), plot_type='partial')
-```
-
-## Generate a few ARIMA orders and then compare results.
+## First modeling approach will be to generate a few ARIMA orders and compare results.
 
 ```{r}
 selected_stock_fit <- selected_stock_information_tsibble |>
@@ -577,12 +578,12 @@ selected_stock_fit <- selected_stock_information_tsibble |>
         arima110 = ARIMA(Close ~ pdq(1,1,0)),
         arima011 = ARIMA(Close ~ pdq(0,1,1)),
         arima111 = ARIMA(Close ~ pdq(1,1,1)),
-        stepwise = ARIMA(Close),
         search = ARIMA(Close, stepwise=FALSE))
 
 print(selected_stock_fit$search)
 
 glance(selected_stock_fit) |> arrange(AICc) |> select(.model:BIC)
+
 ```
 
 ## Show the residuals using the 'search' ARIMA 
@@ -601,7 +602,37 @@ augment(selected_stock_fit) |>
   features(.innov, ljung_box, lag = 10, dof = 3)
 ```
 
-## First Prediction using ARIMA
+## Second approach, creating a Train set and a Test set with stepwise ARIMA and Prophet models
+
+```{r}
+length_df = nrow(selected_stock_information_tsibble)
+Train_number = round(length_df * 0.98, 0)
+
+
+Train <- selected_stock_information_tsibble %>%
+  filter(row_value <= Train_number) %>%
+  mutate(Date = as.Date(Date,origin="2022-01-01")) %>%
+  as_tsibble(index=Date) %>%
+  fill_gaps()
+Test <- selected_stock_information_tsibble[Train_number:length_df,]
+
+```
+
+## Period is set to twelve for the months, and order = 1 since data is non-seasonal
+
+```{r}
+selected_stock_information_tsibble_fit <- Train |>
+  model(
+    arima = ARIMA(Close),
+    prophet = prophet(Close ~ season(period = 12, order = 1,
+                                    type = "additive"))
+  )
+```
+
+\newpage
+# 3.5 - Predictions
+
+## First Prediction - uses selected ARIMA
 
 ```{r}
 selected_stock_fit |>
@@ -613,46 +644,22 @@ selected_stock_fit |>
        x = "Trading Days")
 ```
 
-## Second approach, first creating a Train set and a Test set
 
-```{r}
-length_df = nrow(selected_stock_information_tsibble)
-Train_number = round(length_df * 0.98, 0)
-
-
-Train <- selected_stock_information_tsibble[0:Train_number,]
-Test <- selected_stock_information_tsibble[Train_number:length_df,]
-
-```
-
-## Period is set to twelve for the months, and order = 1 since data is non-seasonal
-
-```{r}
-selected_stock_information_tsibble_fit <- Train |>
-  model(
-    arima = ARIMA(Close),
-    ets = ETS(Close),
-    prophet = prophet(Close ~ season(period = 12, order = 1,
-                                    type = "additive"))
-  )
-```
-
-## Prophet model is not good since there is no seasonality
+## Second Prediction set - Prophet + stepwise ARIMA
 
 ```{r}
 selected_stock_information_tsibble_fit_fc <- selected_stock_information_tsibble_fit |> forecast(h = 30)
-selected_stock_information_tsibble_fit_fc |> autoplot() + autolayer(selected_stock_information_tsibble) +   
+selected_stock_information_tsibble_fit_fc |> autoplot(selected_stock_information_tsibble %>% as_tsibble(index=Date)) +    
   labs(y = "Stock Value ($)",
        title = paste(file_name, "Daily Closing Price over Time"),
        x = "Trading Days")
 ```
 
+## 4 - Conclusions
 
+Each of the stocks appears to be best modeled by random walk models, either with or without drift. This aligns with conventional wisdom of stock prices following a random walk pattern, although the timeframe selected (Jan 1, 2022 through Mar 24, 2023) features a downwards drift for many cases. 
 
-```{r}
-
-```
-
+Including a different timeframe, or different stocks, may result in random walks without drift or random walks with upwards drift providing a better model fit for stock prices.
 
 # Team contributions (pending...)
 
@@ -660,4 +667,4 @@ Brian: Completed rough draft of the Part 2 submission.
 
 Mohan: Generated Github repo and place Datasets. Picked option 1.
 
-Brendan: Picked option 1.
+Brendan: Formatted Part 2 document, provided model descriptions and rough draft bug fixes.
