@@ -22,6 +22,9 @@ library(fpp3)
 library(fable.prophet)
 ```
 
+The report included features analyses of closing prices for 3 separate stocks for the time period from Jan 1, 2022 through Mar 24, 2023. Each stock features the same analyses to understand how different stocks prices' closing patterns act and whether they can be fit to similar models.
+
+\newpage
 # 1 - Analysis of AAPL
 # 1.0 - Analysis Setup
 
@@ -93,19 +96,23 @@ autoplot(selected_stock_information_tsibble) +
 ```
 
 \newpage
-## create residual, ACF, PACF plots
+## Create residual, ACF, PACF plots
 
 ```{r}
 selected_stock_information_tsibble |>
   gg_tsdisplay(difference(Close), plot_type='partial')
 ```
 
-Residuals, ACF, and PACF suggest the series is similar to white noise.
+Residuals, ACF, and PACF suggest the series is a random walk.
 
 \newpage
 # 1.3 - Description of the Time Series:
 
-### INPUT SOMETHING 
+As is frequently noted, stocks tend to resemble random walk time series. The AAPL stock time series is no different; the stock's closing value appears to fluctuate up or down on each given day with no particular pattern, with some periods featuring larger downwards movements and some periods featuring larger upwards movements.
+
+The period of time displayed may feature a slight downwards drift for AAPL stock - the ARIMA search method can be applied to determine how to best model the AAPL time series, but the residuals, ACF, and PACF as well as the fluctuations within the time series itself suggest a model with a random walk.
+
+There is no apparent element of seasonality, and the time series is likely not stationary.
 
 \newpage
 # 1.4 - TS Models (transformations)
@@ -317,7 +324,11 @@ Residuals, ACF, and PACF suggest the series is similar to white noise.
 \newpage
 # 2.3 - Description of the Time Series:
 
-### INPUT SOMETHING 
+Much like the AAPL stock, MSFT stock represents a random walk in terms of day-to-day fluctuations featuring high levels of variability. The extended upward and downward patterns in the MSFT closing price mirror the periods in which AAPL exhibited the same patterns, suggesting that broader market forces impact both stocks.
+
+Additionally, the MSFT stock may also feature a downwards drift, although the MSFT decline over the period from $330.81 to $280.57 per share (-15.2%) represents a larger decline than AAPL's decline from $180.68 to $160.25 per share (-11.3%). This suggests that further analysis may uncover a larger downward drift in MSFT's price over the period than AAPL's after accounting for market forces.
+
+There is no apparent element of seasonality, and the time series is likely not stationary.
 
 \newpage
 # 2.4 - TS Models (transformations)
@@ -345,7 +356,7 @@ selected_stock_information_tsibble |>
 ```
 
 
-### Using Box-Cox Transformation does not change the shape of the Closing Price with a lambda value of 1.
+### Using Box-Cox Transformation does not change the shape of the Closing Price with a lambda value of 1.36
 
 ```{r}
 lambda <- selected_stock_information_tsibble |>
@@ -528,7 +539,11 @@ Residuals, ACF, and PACF suggest the series is similar to white noise.
 \newpage
 # 3.3 - Description of the Time Series:
 
-### INPUT SOMETHING 
+Despite the fact that TSLA's closing price mirrors the pattern of a random walk, the closing price at the end of the period of $190.41 per share is a 52.4% decline from the first closing price per share of $399.93. 
+
+The high levels of variation in TSLA's stock price in periods of both upwards and downwards movement may make it more difficult to create an adequate random walk model, despite the downwards drift being more pronounced in TSLA's stock price.
+
+There is no apparent element of seasonality, and the time series is certainly not stationary based on the large decline in value over the period relative to other stocks.
 
 \newpage
 # 3.4 - TS Models (transformations)
@@ -655,16 +670,16 @@ selected_stock_information_tsibble_fit_fc |> autoplot(selected_stock_information
        x = "Trading Days")
 ```
 
-## 4 - Conclusions
+# 4 - Conclusions
 
-Each of the stocks appears to be best modeled by random walk models, either with or without drift. This aligns with conventional wisdom of stock prices following a random walk pattern, although the timeframe selected (Jan 1, 2022 through Mar 24, 2023) features a downwards drift for many cases. 
+Each of the stocks appears to be best modeled by random walk models, either with or without drift. This aligns with conventional wisdom of stock prices following a random walk pattern, although the timeframe selected (Jan 1, 2022 through Mar 24, 2023) features a downwards drift for many cases as the broader market saw a large pullback in stock prices. 
 
 Including a different timeframe, or different stocks, may result in random walks without drift or random walks with upwards drift providing a better model fit for stock prices.
 
-# Team contributions (pending...)
+# Team contributions
 
 Brian: Completed rough draft of the Part 2 submission. 
 
-Mohan: Generated Github repo and place Datasets. Picked option 1.
+Mohan: Generated Github repo and place Datasets. Worked ahead on web app dashboard draft.
 
 Brendan: Formatted Part 2 document, provided model descriptions and rough draft bug fixes.
