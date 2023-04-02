@@ -7,14 +7,16 @@ output:
   html_document: default
 ---
 
-# Load Library Packages
+
+Load Library Packages
 
 ```{r setup, include=FALSE}
 library(fpp3)
 library(fable.prophet)
 ```
 
-# AAPL
+# 1 - Analysis of AAPL
+# 1.0 - Analysis Setup
 
 ## Set up File name
 
@@ -26,7 +28,10 @@ file = "Data/AAPL_2023-03-26.csv"
 
 ```{r}
 Stock_information <- read.csv(file)
-selected_stock_information <- Stock_information %>% select(c('Date','Close')) %>% mutate(row_value = row_number())
+
+selected_stock_information <- Stock_information %>% 
+  select(c('Date','Close')) %>% 
+  mutate(row_value = row_number())
 ```
 
 ## Collect Stock/ETF Ticker to be displayed on future visualizations to remove confusion
@@ -41,7 +46,7 @@ file_name = substring(file,6,9)
 selected_stock_information_tsibble <- as_tsibble(selected_stock_information, index = row_value)
 ```
 
-## Set up for Monthly; second set. This could be useful in the futre.
+## Set up for Monthly; second set. This could be useful in the future.
 
 ```{r}
 selected_stock_information_monthly <- yearmonth(selected_stock_information$`Date`, format = "%Y-%m-%d") 
@@ -50,11 +55,14 @@ selected_stock_information_montly_tsibble <- as_tsibble(selected_stock_informati
 ```
 
 ```{r}
-selected_stock_information_montly_aggregated_tsibble <- selected_stock_information_montly_tsibble %>% aggregate(Close ~ Date, sum) %>% mutate(row_value = row_number()) %>% as_tsibble(index = row_value) 
+selected_stock_information_montly_aggregated_tsibble <- selected_stock_information_montly_tsibble %>% 
+  aggregate(Close ~ Date, sum) %>% 
+  mutate(row_value = row_number()) %>% 
+  as_tsibble(index = row_value) 
 ```
 
-
-# Decomposition
+\newpage
+# 1.1 - Decomposition
 
 ```{r}
 dcmp <- selected_stock_information_tsibble |>
@@ -65,7 +73,9 @@ components(dcmp) |> autoplot() +
        y = "Stock Value ($)",
        x = "Trading Days")
 ```
-# Time Series Visualization (needs another visualization)
+
+\newpage
+# 1.2 - Time Series Visualization (needs another visualization)
 
 ```{r}
 autoplot(selected_stock_information_tsibble) +
@@ -113,16 +123,18 @@ selected_stock_information_tsibble |>
 ```
 
 
-
-# Description of the Time Series:
+\newpage
+# 1.3 - Description of the Time Series:
 
 ### INPUT SOMETHING 
 
-# TS Models (transformations)
+\newpage
+# 1.4 - TS Models (transformations)
 
 ### Input SOMETHING like differencing?
 
-# Predictions
+\newpage
+# 1.5 - Predictions
 
 ## ARIMA approach
 
@@ -199,7 +211,7 @@ selected_stock_information_tsibble_fit <- Train |>
   )
 ```
 
-# Prophet model is not good since there is no seasonality
+## Prophet model is not good since there is no seasonality
 
 ```{r}
 selected_stock_information_tsibble_fit_fc <- selected_stock_information_tsibble_fit |> forecast(h = 30)
@@ -217,8 +229,9 @@ selected_stock_information_tsibble_fit_fc |> autoplot() + autolayer(selected_sto
 
 
 
-
-# MSFT
+\newpage
+# 2 - Analysis of MSFT
+# 2.0 - Analysis Setup
 
 ## Set up File name
 
@@ -230,7 +243,8 @@ file = "Data/MSFT_2023-03-26.csv"
 
 ```{r}
 Stock_information <- read.csv(file)
-selected_stock_information <- Stock_information %>% select(c('Date','Close')) %>% mutate(row_value = row_number())
+selected_stock_information <- Stock_information %>% select(c('Date','Close')) %>% 
+  mutate(row_value = row_number())
 ```
 
 ## Collect Stock/ETF Ticker to be displayed on future visualizations to remove confusion
@@ -245,7 +259,7 @@ file_name = substring(file,6,9)
 selected_stock_information_tsibble <- as_tsibble(selected_stock_information, index = row_value)
 ```
 
-## Set up for Monthly; second set. This could be useful in the futre.
+## Set up for Monthly; second set. This could be useful in the future.
 
 ```{r}
 selected_stock_information_monthly <- yearmonth(selected_stock_information$`Date`, format = "%Y-%m-%d") 
@@ -254,11 +268,13 @@ selected_stock_information_montly_tsibble <- as_tsibble(selected_stock_informati
 ```
 
 ```{r}
-selected_stock_information_montly_aggregated_tsibble <- selected_stock_information_montly_tsibble %>% aggregate(Close ~ Date, sum) %>% mutate(row_value = row_number()) %>% as_tsibble(index = row_value) 
+selected_stock_information_montly_aggregated_tsibble <- selected_stock_information_montly_tsibble %>% 
+  aggregate(Close ~ Date, sum) %>% mutate(row_value = row_number()) %>% 
+  as_tsibble(index = row_value) 
 ```
 
-
-# Decomposition
+\newpage
+# 2.1 - Decomposition
 
 ```{r}
 dcmp <- selected_stock_information_tsibble |>
@@ -269,7 +285,9 @@ components(dcmp) |> autoplot() +
        y = "Stock Value ($)",
        x = "Trading Days")
 ```
-# Time Series Visualization (needs another visualization)
+
+\newpage
+# 2.2 - Time Series Visualization (needs another visualization)
 
 ```{r}
 autoplot(selected_stock_information_tsibble) +
@@ -317,16 +335,18 @@ selected_stock_information_tsibble |>
 ```
 
 
-
-# Description of the Time Series:
+\newpage
+# 2.3 - Description of the Time Series:
 
 ### INPUT SOMETHING 
 
-# TS Models (transformations)
+\newpage
+# 2.4 - TS Models (transformations)
 
 ### Input SOMETHING like differencing?
 
-# Predictions
+\newpage
+# 2.5 - Predictions
 
 ## ARIMA approach
 
@@ -403,7 +423,7 @@ selected_stock_information_tsibble_fit <- Train |>
   )
 ```
 
-# Prophet model is not good since there is no seasonality
+## Prophet model is not good since there is no seasonality
 
 ```{r}
 selected_stock_information_tsibble_fit_fc <- selected_stock_information_tsibble_fit |> forecast(h = 30)
@@ -420,7 +440,9 @@ selected_stock_information_tsibble_fit_fc |> autoplot() + autolayer(selected_sto
 
 ```
 
-# TSLA
+\newpage
+# 3 - Analysis of TSLA
+# 3.0 - Analysis Setup
 
 ## Set up File name
 
@@ -432,7 +454,10 @@ file = "Data/TSLA_2023-03-26.csv"
 
 ```{r}
 Stock_information <- read.csv(file)
-selected_stock_information <- Stock_information %>% select(c('Date','Close')) %>% mutate(row_value = row_number())
+
+selected_stock_information <- Stock_information %>% 
+  select(c('Date','Close')) %>% 
+  mutate(row_value = row_number())
 ```
 
 ## Collect Stock/ETF Ticker to be displayed on future visualizations to remove confusion
@@ -447,7 +472,7 @@ file_name = substring(file,6,9)
 selected_stock_information_tsibble <- as_tsibble(selected_stock_information, index = row_value)
 ```
 
-## Set up for Monthly; second set. This could be useful in the futre.
+## Set up for Monthly; second set. This could be useful in the future.
 
 ```{r}
 selected_stock_information_monthly <- yearmonth(selected_stock_information$`Date`, format = "%Y-%m-%d") 
@@ -456,11 +481,14 @@ selected_stock_information_montly_tsibble <- as_tsibble(selected_stock_informati
 ```
 
 ```{r}
-selected_stock_information_montly_aggregated_tsibble <- selected_stock_information_montly_tsibble %>% aggregate(Close ~ Date, sum) %>% mutate(row_value = row_number()) %>% as_tsibble(index = row_value) 
+selected_stock_information_montly_aggregated_tsibble <- selected_stock_information_montly_tsibble %>% 
+  aggregate(Close ~ Date, sum) %>% 
+  mutate(row_value = row_number()) %>% 
+  as_tsibble(index = row_value) 
 ```
 
-
-# Decomposition
+\newpage
+# 3.1 - Decomposition
 
 ```{r}
 dcmp <- selected_stock_information_tsibble |>
@@ -471,7 +499,9 @@ components(dcmp) |> autoplot() +
        y = "Stock Value ($)",
        x = "Trading Days")
 ```
-# Time Series Visualization (needs another visualization)
+
+\newpage
+# 3.2 - Time Series Visualization (needs another visualization)
 
 ```{r}
 autoplot(selected_stock_information_tsibble) +
@@ -519,16 +549,18 @@ selected_stock_information_tsibble |>
 ```
 
 
-
-# Description of the Time Series:
+\newpage
+# 3.3 - Description of the Time Series:
 
 ### INPUT SOMETHING 
 
-# TS Models (transformations)
+\newpage
+# 3.4 - TS Models (transformations)
 
 ### Input SOMETHING like differencing?
 
-# Predictions
+\newpage
+# 3.5 - Predictions
 
 ## ARIMA approach
 
@@ -605,7 +637,7 @@ selected_stock_information_tsibble_fit <- Train |>
   )
 ```
 
-# Prophet model is not good since there is no seasonality
+## Prophet model is not good since there is no seasonality
 
 ```{r}
 selected_stock_information_tsibble_fit_fc <- selected_stock_information_tsibble_fit |> forecast(h = 30)
