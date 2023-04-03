@@ -1,8 +1,9 @@
 ---
 title: "D590_Final_Project_Part_2"
-author: "Brian Kenney, Prabakar Mohan, Brendan Kelly"
+author: "Brian Kenney (Team Lead), Prabakar Mohan, Brendan Kelly"
 date: "`r Sys.Date()`"
 output:
+  pdf_document: default
   html_document:
     fig_height: 5
     fig_width: 8
@@ -13,7 +14,6 @@ output:
     number_sections: false
     theme: readable
     highlight: tango
-  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -394,7 +394,7 @@ selected_stock_fit |>
   gg_tsresiduals()
 ```
 
-### Portmanteau test shows a large P-value, suggesting the residuals are simliar to white noise
+### Portmanteau test shows a P-value greater than 0.05, suggesting the residuals are simliar to white noise
 
 ```{r}
 augment(selected_stock_fit) |>
@@ -534,7 +534,7 @@ selected_stock_information_tsibble |>
   gg_tsdisplay(difference(Close), plot_type='partial')
 ```
 
-Residuals, ACF, and PACF suggest the series is similar to white noise.
+Residuals, ACF, and PACF suggest the series is not similar to white noise.
 
 \newpage
 # 3.3 - Description of the Time Series:
@@ -571,7 +571,7 @@ selected_stock_information_tsibble |>
 ```
 
 
-### Using Box-Cox Transformation does not change the shape of the Closing Price with a lambda value of 1.
+
 
 ```{r}
 lambda <- selected_stock_information_tsibble |>
@@ -609,7 +609,7 @@ selected_stock_fit |>
   gg_tsresiduals()
 ```
 
-### Portmanteau test shows a large P-value, suggesting the residuals are simliar to white noise
+### Portmanteau test shows a P-value less than 0.05, suggesting the residuals are not simliar to white noise
 
 ```{r}
 augment(selected_stock_fit) |>
@@ -672,14 +672,14 @@ selected_stock_information_tsibble_fit_fc |> autoplot(selected_stock_information
 
 # 4 - Conclusions
 
-Each of the stocks appears to be best modeled by random walk models, either with or without drift. This aligns with conventional wisdom of stock prices following a random walk pattern, although the timeframe selected (Jan 1, 2022 through Mar 24, 2023) features a downwards drift for many cases as the broader market saw a large pullback in stock prices. 
+Each of the stocks appears to be best modeled by random walk models, either with or without drift. This aligns with conventional wisdom of stock prices following a random walk pattern, although the time frame selected (Jan 1, 2022 through Mar 24, 2023) features a downwards drift for many cases as the broader market saw a large pullback in stock prices. 
 
-Including a different timeframe, or different stocks, may result in random walks without drift or random walks with upwards drift providing a better model fit for stock prices.
+Including a different time frame, or different stocks, may result in random walks without drift or random walks with upwards drift providing a better model fit for stock prices.
 
 # Team contributions
 
 Brian: Completed rough draft of the Part 2 submission. 
 
-Mohan: Generated Github repo and place Datasets. Worked ahead on web app dashboard draft.
+Mohan: Generated Github repo and place Data sets. Worked ahead on web app dashboard draft.
 
 Brendan: Formatted Part 2 document, provided model descriptions and rough draft bug fixes.
