@@ -1,10 +1,7 @@
 library(quantmod)
 library(shiny)
+library(forecast)
 library(fpp3)
-
-#refer to https://cran.r-project.org/web/packages/rugarch/rugarch.pdf
-#also refer to https://users.metu.edu.tr/home402/ozancan/wwwhome/ARCHGARCHTutorial.html
-#this is for the GARCH model
 library(rugarch)
 
 ui <- fluidPage(
@@ -138,6 +135,9 @@ server <- function(input, output, session){
       } else if (input$model == "GARCH") {
         
        
+        #refer to https://cran.r-project.org/web/packages/rugarch/rugarch.pdf
+        #also refer to https://users.metu.edu.tr/home402/ozancan/wwwhome/ARCHGARCHTutorial.html
+        #this is for the GARCH model
         garch_spec <- ugarchspec(variance.model=list(model="sGARCH", 
                                                      garchOrder=c(1,1)))
         
