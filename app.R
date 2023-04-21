@@ -3,6 +3,8 @@ library(shiny)
 library(forecast)
 library(rugarch)
 library(prophet)
+library(ggplot2)
+library(shinyalert)
 
 ui <- fluidPage(
   
@@ -17,8 +19,9 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       tabsetPanel(id="tabset",
-                  tabPanel("Stocks",   selectInput("Stock", "Stock", choices = c("AAPL", "TSLA", "MSFT"), width = "100px")),
-                  tabPanel("ETF", selectInput("ETF", "ETF/Sector", choices = c("VTI", "VOO", "VUG"), width = "100px"))
+                  tabPanel("Stocks",   selectInput("Stock", "Stock", choices = c("AAPL", "TSLA", "MSFT", "GOOG", "AMZN"), width = "100px")),
+                  tabPanel("ETF", selectInput("ETF", "ETF/Sector", choices = c("VTI", "VOO", "VUG", "AOR", "AOM"), width = "100px")),
+                  tabPanel("Bonds",   selectInput("Bonds", "Bonds", choices = c("DEECX","FCBFX"), width = "100px"))
       ),
       
       # Date range
@@ -49,7 +52,10 @@ ui <- fluidPage(
 
 server <- function(input, output, session){
   
-  
+  shinyalert(html = TRUE, text = tagList(
+    textInput("Disclaimer", "This is for information only. Do not take this as financial advice.", "I understand."),
+  ))
+
   #Show a plot of the ticker historical distribution
   output$qm_plot <- renderPlot({
     
@@ -57,6 +63,11 @@ server <- function(input, output, session){
     {
       ticker = input$Stock
     }
+
+    else if(input$tabset =="Bonds")
+    {
+      ticker = input$Bonds}
+    
     else
     {
       ticker = input$ETF
@@ -86,6 +97,10 @@ server <- function(input, output, session){
     {
       ticker = input$Stock
     }
+    else if(input$tabset =="Bonds")
+    {
+      ticker = input$Bonds
+    }
     else
     {
       ticker = input$ETF
@@ -100,7 +115,7 @@ server <- function(input, output, session){
     if (input$model == "naive"){
       
       mod <- naive(stock[start : end, close_price])
-      # Plot the result
+      # Plot the result. 
       autoplot(forecast(mod, h = n)) +
         ggplot2::labs(y = "Price($)", x = " Time (days)")
       
@@ -148,12 +163,15 @@ server <- function(input, output, session){
       forecast_prop <- predict(mod_prop, future_prop)
       # Plot the result
       #plot(mod_prop, forecast_prop,xlab="Years",ylab="Price")
-      plot(mod_prop, forecast_prop, main="Prophet Forecasts", xlab="Month", ylab="Price($)")
+      plot(mod_prop, forecast_prop, main="Prophet Forecasts", xlab="Month", ylab="Price($)") + ggtitle("Prophet")
+      
       
       
     }
     
-  })    
+  }, bg = "White")
+  
+  
   
 }
 shinyApp(ui, server)
