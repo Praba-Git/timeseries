@@ -25,16 +25,16 @@ ui <- fluidPage(
       ),
       
       # Date range
-      dateRangeInput("date_range", "Date range:", start = Sys.Date()-60, end = Sys.Date()-7,width="250px",format = "yyyy-mm-dd"),
+      dateRangeInput("date_range", "Date range:", start = Sys.Date()-200, end = Sys.Date(), width="250px",format = "yyyy-mm-dd"),
       
       # days for prediction ahead
       div(style = "white-space: nowrap;", 
-          numericInput("h", "Days to Predict", value =2,width = "65px")
+          numericInput("h", "Days to Predict", value = 2, width = "65px")
       ),
       
       # add options for selecting a prediction method
       radioButtons("model", "Forecasting Model Applied",
-                   choices = c("naive", "ARIMA", "GARCH","Prophet","K-NN"),
+                   choices = c("Naive", "ARIMA", "GARCH","Prophet","K-NN"),
                    choiceValues = "ARIMA"
       )
       
@@ -112,7 +112,7 @@ server <- function(input, output, session){
     start = 1 #end - 1
     close_price = paste(ticker,".Close",sep="")
     
-    if (input$model == "naive"){
+    if (input$model == "Naive"){
       
       mod <- naive(stock[start : end, close_price])
       # Plot the result. 
@@ -129,18 +129,20 @@ server <- function(input, output, session){
       
     } else if (input$model == "GARCH") {
       
-      #refer to https://cran.r-project.org/web/packages/rugarch/rugarch.pdf
-      #also refer to https://users.metu.edu.tr/home402/ozancan/wwwhome/ARCHGARCHTutorial.html
-      #this is for the GARCH model
-      garch_spec <- ugarchspec(variance.model=list(model="sGARCH", 
-                                                   garchOrder=c(1,1)))
+      
+      #Set up the GARCH model using ugarchspec. Using sGARCH, which assumes symmetry
+      spec <- ugarchspec(mean.model = list(armaOrder = c(1,1)), variance.model = list(model = "sGARCH"))
+      
+      #Fit the model
+      garchfit <- ugarchfit(spec = spec, data = stock[start : end, close_price])
+      
+      #Get the standard deviation of the residuals
+      volatility <- sigma(garchfit)
+      
+      # Plotting the obtained volatility
+      plot(volatility)
       
       
-      fit_garch <- ugarchfit(spec = garch_spec, data = stock[start : end, close_price], method = "ML")
-      
-      garch_forecast <- ugarchforecast(fit_garch, n.ahead = n)
-      
-      plot(garch_forecast,  which = 1)
       
     } else if (input$model == "K-NN") {
       
