@@ -9,9 +9,9 @@ library(shinyalert)
 ui <- fluidPage(
   
   # browser  title
-  title = "Stock/ETF Analysis and Predictions",
+  title = "Stock/ETF/Bond Analysis and Predictions",
   # Application title
-  titlePanel(div("Stock/ETF Analysis and Predictions", style = "color: #FFFFFF;font-size:25px;font-style: italic;")),
+  titlePanel(div("Stock/ETF/Bond Analysis and Predictions", style = "color: #FFFFFF;font-size:25px;font-style: italic;")),
   
   tags$style('.container-fluid {background-color:black;}'),
   
